@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="BottomNavigationViewIcon" parent="Widget.MaterialComponents.BottomNavigationView">
+        <item name="itemIconSize">42dp</item> <!-- Cambia esto al tamaño deseado -->
+    </style>
+
+</resources>
