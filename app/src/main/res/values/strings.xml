@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">Aquisito_1</string>
-    <string name="location_title">ubicación</string>
-    <string name="config_title">Configuracion</string>
+    <string name="location_title">Ubicación</string>
+    <string name="config_title">Configuración</string>
     <string name="content_description_location">Pestaña de ubicacion actual</string>
     <string name="content_description_config">Pestaña de configuración</string>
 
