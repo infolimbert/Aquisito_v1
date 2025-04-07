@@ -4,13 +4,15 @@ import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
 import androidx.fragment.app.Fragment
+import androidx.navigation.findNavController
+import androidx.navigation.ui.setupActionBarWithNavController
+import androidx.navigation.ui.setupWithNavController
 import com.example.aquisito_1.databinding.ActivityMainBinding
 import com.google.android.material.bottomnavigation.BottomNavigationView
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var mBinding: ActivityMainBinding
-
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -22,9 +24,13 @@ class MainActivity : AppCompatActivity() {
         val toolbar: Toolbar = mBinding.toolbar // Obtén la referencia a la Toolbar
         setSupportActionBar(toolbar)  //Establece la Toolbar como la ActionBar
 
-        val bottomNavigationView: BottomNavigationView = mBinding.bottomNav // Obtén la referencia al BottomNavigationView
+        mBinding.bottomNav.setupWithNavController(findNavController(R.id.nav_host_fragment))
 
-        // Configurar el listener para el BottomNavigationView
+       /* // Configurar la navegación con el NavController
+        setupActionBarWithNavController(navController)*/
+
+
+        /*   // Configurar el listener para el BottomNavigationView
         bottomNavigationView.setOnItemSelectedListener { item ->
             when (item.itemId) {
                 R.id.action_location -> {
@@ -51,10 +57,11 @@ class MainActivity : AppCompatActivity() {
             transaction.replace(R.id.hostFragment, fragment)
             transaction.addToBackStack(null)
             transaction.commit()
-        }
+        }*/
 
 
-        fun updateToolbarTitle(title: String) {
+        /*fun updateToolbarTitle(title: String) {
             supportActionBar?.title = title
-        }
+        }*/
     }
+}

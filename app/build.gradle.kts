@@ -1,3 +1,5 @@
+
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
@@ -10,7 +12,7 @@ android {
     defaultConfig {
         applicationId = "com.example.aquisito_1"
         minSdk = 27
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
@@ -53,5 +55,10 @@ dependencies {
 
     // para fragmentos
     implementation("androidx.fragment:fragment-ktx:1.8.6")
+    // dependencias necesarias par ael nav component
+    implementation("androidx.navigation:navigation-fragment-ktx:2.8.9")
+    implementation("androidx.navigation:navigation-ui-ktx:2.8.9")
+
+
 
 }

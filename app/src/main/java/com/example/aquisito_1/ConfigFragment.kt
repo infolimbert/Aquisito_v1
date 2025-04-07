@@ -15,8 +15,8 @@ class ConfigFragment: Fragment() {
         return inflater.inflate(R.layout.fragment_config, container, false)
     }
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+    /*override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         (activity as? MainActivity)?.updateToolbarTitle(getString(R.string.config_title))
-    }
+    }*/
 }

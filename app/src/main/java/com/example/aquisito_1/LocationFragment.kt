@@ -19,8 +19,8 @@ class LocationFragment:Fragment() {
 
     }
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+    /*override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         (activity as? MainActivity)?.updateToolbarTitle(getString(R.string.location_title))
-    }
+    }*/
 }
