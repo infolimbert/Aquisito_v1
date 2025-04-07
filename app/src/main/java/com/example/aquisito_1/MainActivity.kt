@@ -25,6 +25,7 @@ class MainActivity : AppCompatActivity() {
         setSupportActionBar(toolbar)  //Establece la Toolbar como la ActionBar
 
         mBinding.bottomNav.setupWithNavController(findNavController(R.id.nav_host_fragment))
+        // esta es una pruebita para saber si se actualiza el PR
 
        /* // Configurar la navegación con el NavController
         setupActionBarWithNavController(navController)*/
