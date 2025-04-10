@@ -1,5 +1,3 @@
-
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
@@ -8,7 +6,6 @@ plugins {
 android {
     namespace = "com.example.aquisito_1"
     compileSdk = 35
-
     defaultConfig {
         applicationId = "com.example.aquisito_1"
         minSdk = 27
@@ -52,13 +49,9 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
-
     // para fragmentos
     implementation("androidx.fragment:fragment-ktx:1.8.6")
     // dependencias necesarias par ael nav component
     implementation("androidx.navigation:navigation-fragment-ktx:2.8.9")
     implementation("androidx.navigation:navigation-ui-ktx:2.8.9")
-
-
-
 }
