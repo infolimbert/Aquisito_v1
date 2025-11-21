@@ -7,7 +7,7 @@
     tools:context=".ConfigFragment">
 
     <TextView
-        android:id="@+id/tvLocation"
+        android:id="@+id/tvCercade"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Cerca de:"
@@ -19,13 +19,24 @@
         app:layout_constraintTop_toTopOf="parent"
         />
     <TextView
-        android:id="@+id/tvOrientation"
+        android:id="@+id/tvLocation"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Direccion: "
         android:textAppearance="?attr/textAppearanceBody1"
-        app:layout_constraintStart_toStartOf="@id/tvLocation"
-        app:layout_constraintTop_toBottomOf="@id/tvLocation"
+        app:layout_constraintStart_toStartOf="@id/tvCercade"
+        app:layout_constraintTop_toBottomOf="@id/tvCercade"
         />
+
+    <Button
+        android:id="@+id/btnEnableGps"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="activar servicio de GPS"
+        app:layout_constraintTop_toBottomOf="@id/tvLocation"
+        app:layout_constraintStart_toStartOf="@id/tvLocation"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+         />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
