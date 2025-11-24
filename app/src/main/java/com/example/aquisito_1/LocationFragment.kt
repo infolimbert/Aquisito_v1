@@ -1,7 +1,9 @@
 package com.example.aquisito_1
 
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.location.LocationManager
 import android.os.Build
@@ -17,6 +19,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.example.aquisito_1.databinding.FragmentLocationBinding
 
 private const val LOCATION_PERMISSION_REQUEST_CODE = 123
@@ -34,17 +37,29 @@ class LocationFragment:Fragment() {
 
     private lateinit var lBinding: FragmentLocationBinding
 
-    override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View? {
-       lBinding = FragmentLocationBinding.inflate(inflater,container,false)
-        return lBinding.root
+    // ⭐ 1. INICIALIZAR EL RECEPTOR DE UBICACIÓN
+    private lateinit var locationReceiver: BroadcastReceiver
 
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+
+        // --- 2. IMPLEMENTACIÓN DEL RECEPTOR ---
+                locationReceiver = object : BroadcastReceiver() {
+                    override fun onReceive(context: Context?, intent: Intent?) {
+                        if (intent?.action == ACTION_LOCATION_BROADCAST) {
+                            val latitude = intent.getDoubleExtra(EXTRA_LATITUDE, 0.0)
+                            val longitude = intent.getDoubleExtra(EXTRA_LONGITUDE, 0.0)
+
+                            // ⭐ AÑADE ESTE LOG TEMPORALMENTE ⭐
+                            Log.d("LocationFragment", "RECEPCIÓN: Lat=$latitude, Lon=$longitude")
+                            // Llama a la función para actualizar la UI
+                            updateLocationDisplay(latitude, longitude)
+                        }
+                    }
+                }
+                // --- FIN DEL RECEPTOR ---
 
         requestLocationPermissionLauncher =
             registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
@@ -80,7 +95,14 @@ class LocationFragment:Fragment() {
 
     }
 
+    override fun onCreateView(
+        inflater: LayoutInflater, container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View? {
+        lBinding = FragmentLocationBinding.inflate(inflater,container,false)
+        return lBinding.root
 
+    }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
@@ -120,6 +142,25 @@ class LocationFragment:Fragment() {
         super.onResume()
         // Cuando el usuario regresa al fragmento, actualizamos el estado del botón
         updateButtonState()
+        // ⭐ 3. REGISTRAR el receptor cuando el fragmento esté visible
+        LocalBroadcastManager.getInstance(requireContext()).registerReceiver(
+            locationReceiver,
+            IntentFilter(ACTION_LOCATION_BROADCAST)
+        )
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // ⭐ 4. ANULAR REGISTRO del receptor para evitar fugas de memoria y errores
+        LocalBroadcastManager.getInstance(requireContext()).unregisterReceiver(locationReceiver)
+    }
+
+    // --- Lógica de UI y Servicios ---
+
+    private fun updateLocationDisplay(latitude: Double, longitude: Double){
+        val display = "Latitud: ${String.format("%.6f", latitude)}\nLongitud: ${String.format("%.6f", longitude)}"
+        // ⭐ ACTUALIZAMOS EL TVDIRECTION
+        lBinding.tvLocation.text = display
     }
 
     private fun checkLocationPermissions() {
@@ -173,6 +214,9 @@ class LocationFragment:Fragment() {
             locationButton.text = getString(R.string.stop_location_tracking)
         } else {
             locationButton.text = getString(R.string.start_location_tracking)
+            // Cuando el rastreo se detiene, podemos limpiar el TextView
+            lBinding.tvLocation.text = "Ubicación inactiva."
+
         }
     }
 
@@ -241,4 +285,8 @@ class LocationFragment:Fragment() {
             .setCancelable(false) // Evita que el diálogo se cierre al tocar fuera
             .show()
     }
+
+
 }
+
+

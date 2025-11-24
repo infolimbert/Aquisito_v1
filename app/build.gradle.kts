@@ -54,4 +54,6 @@ dependencies {
     // dependencias necesarias par ael nav component
     implementation("androidx.navigation:navigation-fragment-ktx:2.8.9")
     implementation("androidx.navigation:navigation-ui-ktx:2.8.9")
+    //dependencias para el servicelocation
+    implementation("com.google.android.gms:play-services-location:21.0.1")
 }
