@@ -51,11 +51,12 @@ class LocationFragment:Fragment() {
                         if (intent?.action == ACTION_LOCATION_BROADCAST) {
                             val latitude = intent.getDoubleExtra(EXTRA_LATITUDE, 0.0)
                             val longitude = intent.getDoubleExtra(EXTRA_LONGITUDE, 0.0)
-
-                            // ⭐ AÑADE ESTE LOG TEMPORALMENTE ⭐
-                            Log.d("LocationFragment", "RECEPCIÓN: Lat=$latitude, Lon=$longitude")
+                            //  LECTURA DE LA DIRECCIÓN
+                            val address = intent.getStringExtra(EXTRA_ADDRESS) ?: "Dirección no disponible"
+                            //  AÑADE ESTE LOG TEMPORALMENTE ⭐
+                            Log.d("LocationFragment", "RECEPCIÓN: Lat=$latitude, Lon=$longitude, Dir=$address")
                             // Llama a la función para actualizar la UI
-                            updateLocationDisplay(latitude, longitude)
+                            updateLocationDisplay(latitude, longitude, address)
                         }
                     }
                 }
@@ -157,10 +158,10 @@ class LocationFragment:Fragment() {
 
     // --- Lógica de UI y Servicios ---
 
-    private fun updateLocationDisplay(latitude: Double, longitude: Double){
-        val display = "Latitud: ${String.format("%.6f", latitude)}\nLongitud: ${String.format("%.6f", longitude)}"
-        // ⭐ ACTUALIZAMOS EL TVDIRECTION
-        lBinding.tvLocation.text = display
+    private fun updateLocationDisplay(latitude: Double, longitude: Double, address: String){
+        // Si quieres conservar Lat/Lon para depuración, puedes mostrarlas en el Log:
+        Log.d("LocationFragment", "Dirección recibida: $address")
+        lBinding.tvLocation.text = "Cerca de: $address"
     }
 
     private fun checkLocationPermissions() {

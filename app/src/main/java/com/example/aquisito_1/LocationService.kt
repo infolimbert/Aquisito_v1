@@ -7,6 +7,8 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.location.Address
+import android.location.Geocoder
 import android.os.Build
 import android.os.IBinder
 import android.os.Looper
@@ -15,6 +17,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.google.android.gms.location.*
+import java.util.Locale
 import kotlin.random.Random
 
 
@@ -23,6 +26,7 @@ import kotlin.random.Random
 const val ACTION_LOCATION_BROADCAST = "com.example.aquisito_1.action.LOCATION_BROADCAST"
 const val EXTRA_LATITUDE = "extra_latitude"
 const val EXTRA_LONGITUDE = "extra_longitude"
+const val EXTRA_ADDRESS = "extra_address" //NUEVA CONSTANTE PARA LA DIRECCIÓN
 
 class LocationService: Service() {
 
@@ -42,7 +46,7 @@ class LocationService: Service() {
         locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY,5000)
             .setWaitForAccurateLocation(false)
             .setMinUpdateIntervalMillis(2500)
-            .setMaxUpdateDelayMillis(10000)
+            .setMaxUpdateDelayMillis(7000)
             .build()
 
         // 2. Definir el callback que manejara las actualizaciones
@@ -72,6 +76,48 @@ class LocationService: Service() {
         return START_STICKY //El servicio se reiniciará si es terminado por el sistema
     }
 
+    // ⭐ NUEVA FUNCIÓN: Implementación de Geocodificación Inversa
+    private fun getAddressFromLocation (latitude:Double, longitude: Double): String{
+        // Usamos Locale.getDefault() para obtener la dirección en el idioma del dispositivo
+        val geocoder=Geocoder(this, Locale.getDefault())
+        return try {
+            val addresses: List<Address>? = geocoder.getFromLocation(latitude, longitude,1)
+
+            if (addresses != null && addresses.isNotEmpty()) {
+                val address = addresses[0]
+
+            // Intentamos obtener la calle o el nombre del lugar.
+            val thoroughfare = address.thoroughfare // nombre de la calle (ej av. camacho)
+            val featureName = address.featureName // nombre de una entidad (ej "plaza murillo")
+            val subLocality = address.subLocality // Barrio o SubLocalidad
+            val locality = address.locality //ciudad/ localidad (ej "La Paz")
+
+            // Construimos la dirección. Priorizamos la calle, luego el featureName.
+            val primary = thoroughfare?: featureName?: "ubicacion sin nombre"
+
+            // Añadimos la ciudad y país si están disponibles
+            val secondary= locality?: subLocality?: ""
+
+            // Formato de salida: "Calle Principal, Ciudad, País"
+            val country = address.countryCode ?: ""
+
+            if (secondary.isNotEmpty()){
+                "$primary, $secondary, $country"
+            }else{
+                "$primary, $country"
+
+            }
+            }   else{
+                "No se encontro la dirección"
+            }
+
+        }catch (e: Exception){
+            // Maneja Geocoding API key errors, network errors, etc.
+            Log.e("LocationService", "Error de Geocodificación: ${e.message}")
+            "Buscando dirección... (Error de red o servicio)"
+        }
+    }
+
     // Método para iniciar las actualizaciones de ubicación
     private fun startLocationUpdates() {
         // Doble verificación de permisos (aunque el Fragmento debería haberlos chequeado)
@@ -87,7 +133,7 @@ class LocationService: Service() {
             stopSelf()
             return
         }
-
+        // Si llegamos aquí, significa que tenemos al menos uno de los permisos (FINE o COARSE).
         try {
             fusedLocationClient.requestLocationUpdates(
                 locationRequest,
@@ -106,21 +152,21 @@ class LocationService: Service() {
         }
     }
 
-
-    //Metodo para detener las actualizaciones de ubicacion
-    private fun stopLocationUpdates(){
-        fusedLocationClient.removeLocationUpdates(locationCallback)
-        Log.d("LocationService", "actualizaciones de ubicacion DETENIDAS...")
-    }
     //Metodo para enviar los datos al Fragmento usando LocalBroadcastManager
     private fun sendLocationBroadcast(latitude: Double, longitude: Double){
+        // ⭐ NUEVO: Obtener la dirección antes de enviar
+        val addressText = getAddressFromLocation(latitude, longitude)
+
+
         val intent = Intent(ACTION_LOCATION_BROADCAST).apply {
             putExtra(EXTRA_LATITUDE, latitude)
             putExtra(EXTRA_LONGITUDE, longitude)
+            putExtra(EXTRA_ADDRESS, addressText) // AQUI ENVIAMOS LA DIRECCION
         }
         LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
-        Log.d("LocationService", "Broadcast enviado: Lat=$latitude, Lon=$longitude")
+        Log.d("LocationService", "Broadcast enviado: Lat=$latitude, Lon=$longitude, Dir=$addressText")
     }
+
 
     private fun startForegroundService(){
         //Crear Canal de notificaion si es android 0 o superior
@@ -139,10 +185,17 @@ class LocationService: Service() {
             .setContentTitle("Ubicacion Activa")
             .setContentText("Rastreando la ubicacion actual...")
             .setSmallIcon(R.drawable.ic_notification)// inserta icono en drawable
+            .setPriority(Notification.PRIORITY_LOW)
             .setOngoing(true) // No se puede deslizar para cerrar
             .build()
 
         startForeground(NOTIFICATION_ID, notification)//ID único para la notificación
+    }
+
+    //Metodo para detener las actualizaciones de ubicacion
+    private fun stopLocationUpdates(){
+        fusedLocationClient.removeLocationUpdates(locationCallback)
+        Log.d("LocationService", "actualizaciones de ubicacion DETENIDAS...")
     }
 
     override fun onDestroy() {
