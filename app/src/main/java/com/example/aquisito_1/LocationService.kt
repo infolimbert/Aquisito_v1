@@ -27,6 +27,9 @@ const val ACTION_LOCATION_BROADCAST = "com.example.aquisito_1.action.LOCATION_BR
 const val EXTRA_LATITUDE = "extra_latitude"
 const val EXTRA_LONGITUDE = "extra_longitude"
 const val EXTRA_ADDRESS = "extra_address" //NUEVA CONSTANTE PARA LA DIRECCIÓN
+//CONSTANTES PARA EL CRUCE DE CALLES
+const val EXTRA_THOROUGHFARE = "extra_thoroughfare"
+const val EXTRA_FEATURE_NAME = "extra_feature_name"
 
 class LocationService: Service() {
 
@@ -45,7 +48,7 @@ class LocationService: Service() {
         // 1. configurar la solicitud de ubicacion (LocationRequest)
         locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY,5000)
             .setWaitForAccurateLocation(false)
-            .setMinUpdateIntervalMillis(2500)
+            .setMinUpdateIntervalMillis(3000)
             .setMaxUpdateDelayMillis(7000)
             .build()
 
@@ -67,6 +70,11 @@ class LocationService: Service() {
         }
     }
 
+    data class AddressInfo(
+        val fullAddress: String,
+        val thoroughfare: String? = null,
+        val featureName: String? = null
+    )
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d("LocationService", "onStartCommand() ejecutado.")
         startForegroundService()
@@ -77,44 +85,46 @@ class LocationService: Service() {
     }
 
     // ⭐ NUEVA FUNCIÓN: Implementación de Geocodificación Inversa
-    private fun getAddressFromLocation (latitude:Double, longitude: Double): String{
+    private fun getAddressFromLocation (latitude:Double, longitude: Double): AddressInfo{
         // Usamos Locale.getDefault() para obtener la dirección en el idioma del dispositivo
         val geocoder=Geocoder(this, Locale.getDefault())
+
         return try {
             val addresses: List<Address>? = geocoder.getFromLocation(latitude, longitude,1)
-
+            // ⭐ CLAVE: Solo pedimos 1 resultado (el más cercano) para evitar referencias lejanas
             if (addresses != null && addresses.isNotEmpty()) {
                 val address = addresses[0]
 
-            // Intentamos obtener la calle o el nombre del lugar.
-            val thoroughfare = address.thoroughfare // nombre de la calle (ej av. camacho)
-            val featureName = address.featureName // nombre de una entidad (ej "plaza murillo")
-            val subLocality = address.subLocality // Barrio o SubLocalidad
-            val locality = address.locality //ciudad/ localidad (ej "La Paz")
+                // 1. Extracción de los componentes esenciales del resultado más cercano
+                val thoroughfare = address.thoroughfare // Calle principal (ej. "Av. Camacho")
+                val featureName = address.featureName // Punto de interés más cercano (ej. "Plaza Murillo" o un número)
+                val subLocality = address.subLocality // Barrio o SubLocalidad
+                val locality = address.locality // Ciudad/Localidad (ej. "La Paz")
+                val country = address.countryCode ?: ""
 
-            // Construimos la dirección. Priorizamos la calle, luego el featureName.
-            val primary = thoroughfare?: featureName?: "ubicacion sin nombre"
+                // 2. Construcción de la dirección completa (fullAddress)
+                val primary = thoroughfare ?: featureName ?: "Ubicación sin nombre"
+                val secondary = locality ?: subLocality ?: ""
 
-            // Añadimos la ciudad y país si están disponibles
-            val secondary= locality?: subLocality?: ""
-
-            // Formato de salida: "Calle Principal, Ciudad, País"
-            val country = address.countryCode ?: ""
-
-            if (secondary.isNotEmpty()){
+            val fullAddressText = if(secondary.isNotEmpty()){
                 "$primary, $secondary, $country"
             }else{
                 "$primary, $country"
-
             }
+            //devolvemos el objeto de datos
+            AddressInfo(
+                fullAddress = fullAddressText,
+                thoroughfare = thoroughfare,
+                featureName = featureName
+            )
             }   else{
-                "No se encontro la dirección"
+                AddressInfo("No se encontró la dirección")
             }
 
         }catch (e: Exception){
             // Maneja Geocoding API key errors, network errors, etc.
             Log.e("LocationService", "Error de Geocodificación: ${e.message}")
-            "Buscando dirección... (Error de red o servicio)"
+            AddressInfo("Buscando dirección... (Error de red/servicio)")
         }
     }
 
@@ -155,16 +165,20 @@ class LocationService: Service() {
     //Metodo para enviar los datos al Fragmento usando LocalBroadcastManager
     private fun sendLocationBroadcast(latitude: Double, longitude: Double){
         // ⭐ NUEVO: Obtener la dirección antes de enviar
-        val addressText = getAddressFromLocation(latitude, longitude)
+        val addressInfo = getAddressFromLocation(latitude, longitude)
 
 
         val intent = Intent(ACTION_LOCATION_BROADCAST).apply {
             putExtra(EXTRA_LATITUDE, latitude)
             putExtra(EXTRA_LONGITUDE, longitude)
-            putExtra(EXTRA_ADDRESS, addressText) // AQUI ENVIAMOS LA DIRECCION
+
+            // ⭐ Enviamos los tres campos de dirección
+            putExtra(EXTRA_ADDRESS, addressInfo.fullAddress) // AQUI ENVIAMOS LA DIRECCION
+            putExtra(EXTRA_THOROUGHFARE, addressInfo.thoroughfare)
+            putExtra(EXTRA_FEATURE_NAME, addressInfo.featureName)
         }
         LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
-        Log.d("LocationService", "Broadcast enviado: Lat=$latitude, Lon=$longitude, Dir=$addressText")
+        Log.d("LocationService", "Broadcast enviado: Lat=$latitude, Lon=$longitude, Dir=${addressInfo.fullAddress}, Street=${addressInfo.thoroughfare}, Feat=${addressInfo.featureName}") // Nuevo Log
     }
 
 
