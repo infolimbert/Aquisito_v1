@@ -3,14 +3,14 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
-        android:id="@+id/action_location"
+        android:id="@+id/locationFragment"
         android:title="@string/location_title"
         android:icon="@drawable/ic_location"
         app:showAsAction="never"
         android:contentDescription="@string/content_description_location" />
 
     <item
-        android:id="@+id/action_config"
+        android:id="@+id/configFragment"
         android:title="@string/config_title"
         android:icon="@drawable/ic_settings"
         app:showAsAction="never"
