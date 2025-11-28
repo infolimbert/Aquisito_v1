@@ -4,6 +4,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.ContentValues.TAG
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -88,6 +89,20 @@ class LocationService: Service() {
         //Iniciar la solicitud de actualizaciones de ubicacion
         startLocationUpdates()
         return START_STICKY //El servicio se reiniciará si es terminado por el sistema
+    }
+
+    // ----------------------------------------------------
+// ⭐ NUEVO MÉTODO: Manejar el cierre de la app desde Recientes
+// ----------------------------------------------------
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        Log.d(TAG, "onTaskRemoved: Aplicación eliminada de recientes. Deteniendo servicio.")
+
+        // 1. Detener las actualizaciones de ubicación
+        stopLocationUpdates()
+
+        // 2. Detener el servicio y remover la notificación (el Foreground Service)
+        stopSelf()
     }
 
     // Función optimizada para verificar la disponibilidad de la red
