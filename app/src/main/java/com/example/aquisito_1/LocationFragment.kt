@@ -176,6 +176,8 @@ class LocationFragment:Fragment() {
         LocalBroadcastManager.getInstance(requireContext()).unregisterReceiver(locationReceiver)
     }
 
+
+
     // --- Lógica de UI y Servicios ---
 
     private fun updateLocationDisplay(

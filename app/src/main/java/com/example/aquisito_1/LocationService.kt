@@ -9,6 +9,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Address
 import android.location.Geocoder
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.IBinder
 import android.os.Looper
@@ -17,6 +19,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.google.android.gms.location.*
+import java.io.IOException
 import java.util.Locale
 import kotlin.random.Random
 
@@ -38,6 +41,13 @@ class LocationService: Service() {
     private lateinit var locationCallback: LocationCallback
     private val NOTIFICATION_CHANNEL_ID = "location_tracking_channel"
     private val NOTIFICATION_ID = 101 // ID fijo para la notificación del servicio en primer plano
+
+    data class AddressInfo(
+        val fullAddress: String,
+        val thoroughfare: String? = null,
+        val featureName: String? = null
+    )
+
 
     override fun onCreate() {
         super.onCreate()
@@ -70,11 +80,7 @@ class LocationService: Service() {
         }
     }
 
-    data class AddressInfo(
-        val fullAddress: String,
-        val thoroughfare: String? = null,
-        val featureName: String? = null
-    )
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d("LocationService", "onStartCommand() ejecutado.")
         startForegroundService()
@@ -84,6 +90,32 @@ class LocationService: Service() {
         return START_STICKY //El servicio se reiniciará si es terminado por el sistema
     }
 
+    // Función optimizada para verificar la disponibilidad de la red
+    private fun isNetworkAvailable(): Boolean {
+        val connectivityManager =
+            getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager?
+
+        if (connectivityManager == null) return false
+
+        // Para versiones modernas (API 23+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val network = connectivityManager.activeNetwork ?: return false
+            val activeNet = connectivityManager.getNetworkCapabilities(network) ?: return false
+
+            return activeNet.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                    activeNet.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
+                    activeNet.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+        } else {
+            // Para versiones antiguas (aunque Location Services requiere una API más alta)
+            @Suppress("DEPRECATION")
+            val networkInfo = connectivityManager.activeNetworkInfo ?: return false
+            @Suppress("DEPRECATION")
+            return networkInfo.isConnected
+        }
+    }
+
+
+
     // ⭐ NUEVA FUNCIÓN: Implementación de Geocodificación Inversa
     private fun getAddressFromLocation (latitude:Double, longitude: Double): AddressInfo{
         // Usamos Locale.getDefault() para obtener la dirección en el idioma del dispositivo
@@ -92,12 +124,16 @@ class LocationService: Service() {
         return try {
             val addresses: List<Address>? = geocoder.getFromLocation(latitude, longitude,1)
             // ⭐ CLAVE: Solo pedimos 1 resultado (el más cercano) para evitar referencias lejanas
-            if (addresses != null && addresses.isNotEmpty()) {
+
+            if (addresses.isNullOrEmpty()) {
+                AddressInfo("No se encontró la dirección")
+            } else {
                 val address = addresses[0]
 
                 // 1. Extracción de los componentes esenciales del resultado más cercano
                 val thoroughfare = address.thoroughfare // Calle principal (ej. "Av. Camacho")
-                val featureName = address.featureName // Punto de interés más cercano (ej. "Plaza Murillo" o un número)
+                val featureName =
+                    address.featureName // Punto de interés más cercano (ej. "Plaza Murillo" o un número)
                 val subLocality = address.subLocality // Barrio o SubLocalidad
                 val locality = address.locality // Ciudad/Localidad (ej. "La Paz")
                 val country = address.countryCode ?: ""
@@ -106,27 +142,32 @@ class LocationService: Service() {
                 val primary = thoroughfare ?: featureName ?: "Ubicación sin nombre"
                 val secondary = locality ?: subLocality ?: ""
 
-            val fullAddressText = if(secondary.isNotEmpty()){
-                "$primary, $secondary, $country"
-            }else{
-                "$primary, $country"
+                val fullAddressText = if (secondary.isNotEmpty()) {
+                    "$primary, $secondary, $country"
+                } else {
+                    "$primary, $country"
+                }
+                //devolvemos el objeto de datos
+                AddressInfo(
+                    fullAddress = fullAddressText,
+                    thoroughfare = thoroughfare,
+                    featureName = featureName
+                )
             }
-            //devolvemos el objeto de datos
+            }catch (e: IOException){
+            // ⭐ MANEJO ESPECÍFICO DE ERROR DE RED O GEOCODER NO DISPONIBLE
+            Log.e("LocationService", "Error de red/servicio Geocoder: ${e.message}")
+            // Devolver un objeto de error específico en caso de fallo de red
             AddressInfo(
-                fullAddress = fullAddressText,
-                thoroughfare = thoroughfare,
-                featureName = featureName
+                fullAddress = "Error de red en Geocodificación. Intente de nuevo con conexión.",
+                thoroughfare = null,
+                featureName = null
             )
-            }   else{
-                AddressInfo("No se encontró la dirección")
-            }
-
-        }catch (e: Exception){
-            // Maneja Geocoding API key errors, network errors, etc.
-            Log.e("LocationService", "Error de Geocodificación: ${e.message}")
-            AddressInfo("Buscando dirección... (Error de red/servicio)")
         }
     }
+
+
+
 
     // Método para iniciar las actualizaciones de ubicación
     private fun startLocationUpdates() {
@@ -165,9 +206,24 @@ class LocationService: Service() {
     //Metodo para enviar los datos al Fragmento usando LocalBroadcastManager
     private fun sendLocationBroadcast(latitude: Double, longitude: Double){
         // ⭐ NUEVO: Obtener la dirección antes de enviar
-        val addressInfo = getAddressFromLocation(latitude, longitude)
+        val addressInfo: AddressInfo
 
+        // 1. Verificar si hay conexión a Internet
+        if (isNetworkAvailable()) {
+            // ✅ Red disponible: Llamar a la geocodificación
+            addressInfo = getAddressFromLocation(latitude, longitude)
 
+        }else {
+            // ❌ Sin red: NO llamar a la geocodificación, crear un objeto AddressInfo de error
+            Log.w("LocationService", "No hay conexión a Internet. Saltando la geocodificación.")
+
+            addressInfo = AddressInfo(
+                fullAddress = "Sin conexión. Se requiere Internet para obtener la dirección.",
+                thoroughfare = null,
+                featureName = null
+            )
+        }
+        // 2. Enviar el Broadcast con los datos (reales o de error)
         val intent = Intent(ACTION_LOCATION_BROADCAST).apply {
             putExtra(EXTRA_LATITUDE, latitude)
             putExtra(EXTRA_LONGITUDE, longitude)
