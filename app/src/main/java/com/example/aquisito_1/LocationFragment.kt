@@ -21,6 +21,7 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.example.aquisito_1.databinding.FragmentLocationBinding
+import java.util.Locale
 
 private const val LOCATION_PERMISSION_REQUEST_CODE = 123
 private const val BACKGROUND_LOCATION_PERMISSION_REQUEST_CODE = 456
@@ -35,21 +36,6 @@ class LocationFragment:Fragment() {
     private lateinit var locationButton: Button
     private lateinit var enableGpsLauncher: ActivityResultLauncher<Intent>
 
-    // ⭐ Propiedades para guardar la última dirección válida
-    private var lastAddress: String? = null
-    private var lastFeatureName: String? = null
-    private var lastThoroughfare: String? = null
-    // ⭐ Nueva variable: La calle que se está reportando actualmente
-    private var currentThoroughfareDisplayed: String? = null
-    // ⭐ Nueva variable: La calle anterior a la actual (será nuestra calle transversal)
-    private var previousThoroughfare: String? = null
-
-    // ... (variables de historial existentes)
-    private var isDisplayingIntersection = false
-    private var intersectionCounter = 0
-    private val intersectionDisplayLimit = 3 // Muestra el mensaje de cruce 3 veces (aprox. 9-15 segundos)
-
-
     private lateinit var lBinding: FragmentLocationBinding
 
     // ⭐ 1. INICIALIZAR EL RECEPTOR DE UBICACIÓN
@@ -60,27 +46,24 @@ class LocationFragment:Fragment() {
         super.onCreate(savedInstanceState)
 
 
-        // --- 2. IMPLEMENTACIÓN DEL RECEPTOR ---
-                locationReceiver = object : BroadcastReceiver() {
-                    override fun onReceive(context: Context?, intent: Intent?) {
-                        if (intent?.action == ACTION_LOCATION_BROADCAST) {
-                            val latitude = intent.getDoubleExtra(EXTRA_LATITUDE, 0.0)
-                            val longitude = intent.getDoubleExtra(EXTRA_LONGITUDE, 0.0)
-                            //  LECTURA DE LA DIRECCIÓN
-                            val address = intent.getStringExtra(EXTRA_ADDRESS) ?: "Dirección no disponible"
-                            // ⭐ Clave: Extraemos los nuevos campos (pueden ser null)
+        // --- IMPLEMENTACIÓN DEL RECEPTOR SIMPLIFICADO ---
+        locationReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent?.action == ACTION_LOCATION_BROADCAST) {
+                    // ⭐ SOLO LEEMOS EL MENSAJE FINAL COMPLETO DEL SERVICIO
+                    val addressMessage = intent.getStringExtra(EXTRA_ADDRESS) ?: "Buscando ubicación..."
 
-                            val thoroughfare = intent.getStringExtra(EXTRA_THOROUGHFARE)
-                            val featureName = intent.getStringExtra(EXTRA_FEATURE_NAME)
+                    Log.d("LocationFragment", "RECEPCIÓN DE MENSAJE: $addressMessage")
 
-                            Log.d("LocationFragment", "RECEPCIÓN: Lat=$latitude, Lon=$longitude, Dir=$address")
-                            Log.d("LocationFragment", "Dirección detallada: Street=$thoroughfare, Feat=$featureName")
-                            // Llama a la función para actualizar la UI
-                            updateLocationDisplay(address, thoroughfare, featureName)
-                        }
-                    }
+                    // Llama a la función para actualizar la UI (con solo 1 argumento)
+                    updateLocationDisplay(addressMessage)
+
                 }
-                // --- FIN DEL RECEPTOR ---
+            }
+        }
+        // --- FIN DEL RECEPTOR ---
+
+
 
         requestLocationPermissionLauncher =
             registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
@@ -156,8 +139,8 @@ class LocationFragment:Fragment() {
 
         // Al iniciar el fragmento, actualizar el estado del botón
         updateButtonState()
-    }
 
+    }
 
     override fun onResume() {
         super.onResume()
@@ -180,91 +163,12 @@ class LocationFragment:Fragment() {
 
     // --- Lógica de UI y Servicios ---
 
-    private fun updateLocationDisplay(
-                                      fullAddress: String,
-                                      thoroughfare: String?,
-                                      featureName: String?
+    private fun updateLocationDisplay(message: String) {
+        // ⭐ El Fragmento solo muestra el mensaje final del servicio
+        lBinding.tvLocation.text = message
 
-    ) {
-        // ----------------------------------------------------
-        // ⭐PASO 1: Persistencia (Guardar la última dirección válida)
-        // ----------------------------------------------------
-        val currentStreet = thoroughfare ?: lastThoroughfare
-        val currentPOI = featureName ?: lastFeatureName
-        val currentAddressText = fullAddress.takeIf {
-            !it.contains("Buscando dirección") && !it.contains("No se encontró la dirección")
-        } ?: lastAddress
-
-        // ⭐ CLAVE: LÓGICA DE HISTORIAL DEL CRUCE
-        if (currentStreet != null && currentStreet != currentThoroughfareDisplayed) {
-            // Hubo un cambio de calle. Movemos la calle mostrada anteriormente a 'previousThoroughfare'.
-            previousThoroughfare = currentThoroughfareDisplayed
-            currentThoroughfareDisplayed = currentStreet // Actualizamos la calle actual
-            isDisplayingIntersection = true // Activamos el mensaje de cruce
-            intersectionCounter = 0 // Reiniciamos el contador
-        }
-
-        // ⭐ CLAVE: CADUCIDAD DEL POI
-        // Si cambiamos de calle, el POI de la calle anterior ya no es relevante.
-        if (lastFeatureName != null) {
-            lastFeatureName = " "
-        }
-
-        // Si estamos mostrando un cruce, incrementamos el contador
-        if (isDisplayingIntersection) {
-            intersectionCounter++
-
-            // Si el contador supera el límite, forzamos la salida del mensaje de cruce.
-            if (intersectionCounter > intersectionDisplayLimit) {
-                isDisplayingIntersection = false
-                previousThoroughfare = null // Borramos la calle anterior para evitar que se use
-            }
-        }
-
-        // --- Lógica de Mensaje ---
-
-        // 1. Buscamos un POI significativo (no queremos números o letras al azar)
-        var poiMessage: String? = ""
-        if (currentPOI != null && currentPOI.matches("^(Plaza|Parque|Iglesia|Hospital|Mercado|Banco|Universidad)\\b.*".toRegex(RegexOption.IGNORE_CASE))) {
-            poiMessage = ", Cerca de: $currentPOI"
-        }
-
-
-        // 1. Lógica para construir el mensaje de la calle
-        val streetMessage = when {
-
-            // ⭐ CASO 1: Cruce Detectado por Historial
-            currentStreet != null &&
-                    previousThoroughfare != null &&
-                    currentStreet != previousThoroughfare &&
-                    isDisplayingIntersection -> {
-
-                // "Entre Calle Bolívar y Chile" (la anterior)
-                "Entre $currentStreet y $previousThoroughfare.$poiMessage"
-            }
-
-            // CASO 2: Calle Simple con POI (No hubo cambio de calle)
-            currentStreet != null && poiMessage != null -> {
-                "En $currentStreet.$poiMessage"
-            }
-
-            // CASO 3: Calle Simple (Sin POI)
-            currentStreet != null -> {
-                "En la $currentStreet."
-            }
-
-            // CASO 4: Último Recurso
-            currentAddressText != null -> {
-                "Dirección: $currentAddressText"
-            }
-
-            else -> {
-                "Buscando ubicación..."
-            }
-        }
-            //2. Actualizar el TextView con la nueva informacion
-            lBinding.tvLocation.text = streetMessage
-        }
+        // ELIMINADA: Toda la lógica de cruces, POIs, contadores, etc.
+    }
 
     private fun checkLocationPermissions() {
         when {
@@ -388,6 +292,7 @@ class LocationFragment:Fragment() {
             .setCancelable(false) // Evita que el diálogo se cierre al tocar fuera
             .show()
     }
+
 
 
 }
