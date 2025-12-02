@@ -8,6 +8,6 @@
     <string name="cancel">cancel</string>
     <string name="permission_location_rationale_title">Permiso de ubicación necesario</string>
     <string name="permission_location_rationale_message">Aquisito necesita acceder a tu ubicación para proporcionar navegación asistida en tiempo real. Por favor, concede el permiso para continuar.</string>
-    <string name="start_location_tracking">Iniciar Ubicación</string>
-    <string name="stop_location_tracking">Detener Ubicación</string>
+    <string name="start_location_tracking">Activar Servicio de ubicacion</string>
+    <string name="stop_location_tracking">Detener Servicio de ubicacion</string>
 </resources>

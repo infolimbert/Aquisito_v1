@@ -7,16 +7,17 @@
     tools:context=".ConfigFragment">
 
     <TextView
-        android:id="@+id/tvCercade"
+        android:id="@+id/tvTituloDireccion"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Cerca de:"
+        android:text="Dirección: "
         android:textAppearance="?attr/textAppearanceHeadline6"
         android:layout_marginLeft="@dimen/common_padding_default"
         android:layout_marginRight="@dimen/common_padding_default"
         android:layout_marginTop="@dimen/common_padding_default"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
+        android:importantForAccessibility="no"
         />
 
     <TextView
@@ -27,25 +28,14 @@
         android:textAppearance="?attr/textAppearanceHeadline6"
         android:layout_marginLeft="@dimen/common_padding_default"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tvCercade"
-        />
-
-    <TextView
-        android:id="@+id/tvDirection"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Direccion: "
-        android:layout_marginTop="@dimen/common_padding_default"
-        android:textAppearance="?attr/textAppearanceBody1"
-        app:layout_constraintStart_toStartOf="@id/tvLocation"
-        app:layout_constraintTop_toBottomOf="@id/tvLocation"
+        app:layout_constraintTop_toBottomOf="@id/tvTituloDireccion"
         />
 
     <Button
         android:id="@+id/btnEnableGps"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="activar servicio de GPS"
+        android:text="activar Servicio"
         app:layout_constraintTop_toBottomOf="@id/tvLocation"
         app:layout_constraintStart_toStartOf="@id/tvLocation"
         app:layout_constraintEnd_toEndOf="parent"

@@ -418,9 +418,6 @@ class LocationService : Service(), TextToSpeech.OnInitListener {
 
         // 3. Comunicar el mensaje de texto al Fragmento (UI)
         broadcastLocation(streetMessage)
-
-        // 4. Actualizar la notificación con el nuevo mensaje (opcional)
-        updateNotification(streetMessage)
         lastStreetMessage = streetMessage
     }
 
