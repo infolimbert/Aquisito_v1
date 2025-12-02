@@ -56,4 +56,6 @@ dependencies {
     implementation("androidx.navigation:navigation-ui-ktx:2.8.9")
     //dependencias para el servicelocation
     implementation("com.google.android.gms:play-services-location:21.0.1")
+    //dependencia para el mediaplayer
+    implementation (libs.androidx.media)
 }

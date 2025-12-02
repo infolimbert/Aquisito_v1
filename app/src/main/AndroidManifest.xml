@@ -27,14 +27,21 @@
         <service
             android:name=".LocationService"
             android:foregroundServiceType="location"
-            tools:ignore="ForegroundServicePermission" />`
+            tools:ignore="ForegroundServicePermission" />
+
+        <receiver android:name="com.example.aquisito_1.VoiceButtonReceiver" android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </receiver>
+
 
         <activity
             android:name=".MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>

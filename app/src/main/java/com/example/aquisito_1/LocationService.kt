@@ -1,12 +1,22 @@
 package com.example.aquisito_1
 
+// Necesitas estas librerías de soporte V4
+// LocationService.kt
+import android.content.Intent
+import android.view.KeyEvent
+
+import android.support.v4.media.session.MediaSessionCompat // ⭐ MediaSession
+import android.support.v4.media.session.PlaybackStateCompat // ⭐ PlaybackState
+import android.media.AudioManager
+
+
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
-import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.location.Address
@@ -19,9 +29,9 @@ import android.speech.tts.TextToSpeech
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import androidx.media.session.MediaButtonReceiver
 import com.google.android.gms.location.*
 import java.util.Locale
-import java.util.concurrent.TimeUnit
 
 private const val TAG = "LocationService"
 private const val CHANNEL_ID = "location_service_channel"
@@ -33,6 +43,17 @@ const val EXTRA_ADDRESS = "extra_address"
 // --- FIN ASUMIDO ---
 
 class LocationService : Service(), TextToSpeech.OnInitListener {
+
+    // LocationService.kt (Dentro de la clase LocationService)
+
+    private lateinit var mediaSession: MediaSessionCompat
+    private lateinit var mediaSessionCallback: MediaSessionCompat.Callback
+    private var lastStreetMessage: String = "Servicio iniciado. Esperando ubicación."
+    private var silencePlayer: SilencePlayer? = null // ⭐ Nuevo
+
+    // Asegúrate de que TAG y los logs estén definidos
+    private val TAG = "LocationService"
+
 
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var locationCallback: LocationCallback
@@ -101,6 +122,7 @@ class LocationService : Service(), TextToSpeech.OnInitListener {
         locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 5000)
             .setWaitForAccurateLocation(true)
             .setMinUpdateIntervalMillis(3000)
+            .setMaxUpdateDelayMillis(7000)
             .build()
 
         locationCallback = object : LocationCallback() {
@@ -113,13 +135,18 @@ class LocationService : Service(), TextToSpeech.OnInitListener {
         // ⭐ REGISTRAR RECEPTOR DE GPS
         val filter = IntentFilter(LocationManager.PROVIDERS_CHANGED_ACTION)
         registerReceiver(gpsStatusReceiver, filter)
+
+        // ⭐ NUEVA IMPLEMENTACIÓN DE MEDIA SESSION
+        initializeMediaSession()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val notification = buildNotification().build() // Llamada a .build()
         startForeground(NOTIFICATION_ID, notification)
+
+        //Iniciar la solicitud de actualizaciones de ubicacion
         startLocationUpdates()
-        return START_STICKY
+        return START_STICKY //El servicio se reiniciará si es terminado por el sistema
     }
 
     override fun onBind(intent: Intent?): IBinder? {
@@ -127,6 +154,7 @@ class LocationService : Service(), TextToSpeech.OnInitListener {
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
+        // 1. Detener las actualizaciones de ubicación
         stopLocationUpdates()
         stopSelf()
         super.onTaskRemoved(rootIntent)
@@ -134,6 +162,19 @@ class LocationService : Service(), TextToSpeech.OnInitListener {
     }
 
     override fun onDestroy() {
+
+        // ⭐ LIBERAR REPRODUCTOR DE SILENCIO
+        silencePlayer?.release()
+        silencePlayer = null
+        Log.d(TAG, "SilencePlayer liberado.")
+
+        // ⭐ LIBERAR MEDIASESSION
+        if (::mediaSession.isInitialized) {
+            mediaSession.isActive = false
+            mediaSession.release()
+            Log.d(TAG, "MediaSession liberada.")
+        }
+
         // ⭐ DESREGISTRAR RECEPTOR DE GPS
         unregisterReceiver(gpsStatusReceiver)
 
@@ -157,6 +198,64 @@ class LocationService : Service(), TextToSpeech.OnInitListener {
             }
         }
     }
+
+    private fun initializeMediaSession() {
+        val mediaButtonReceiverComponent = ComponentName(this,VoiceButtonReceiver::class.java)
+
+        mediaSession = MediaSessionCompat(this, TAG, mediaButtonReceiverComponent, null).apply {
+            setFlags(
+                MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or
+                MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS
+            )
+            isActive = true
+
+            // --- 1. CONFIGURACIÓN DEL ESTADO ---
+            val playbackState = PlaybackStateCompat.Builder().run {
+                setActions(PlaybackStateCompat.ACTION_PLAY or PlaybackStateCompat.ACTION_PAUSE or PlaybackStateCompat.ACTION_PLAY_PAUSE)
+                // ⭐ IMPORTANTE: Colocamos el estado en PLAYING porque estamos reproduciendo silencio.
+                setState(PlaybackStateCompat.STATE_PLAYING, PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, 0f)
+            }.build()
+            setPlaybackState(playbackState)
+
+            // Definición del Callback para interceptar los eventos de botón
+            mediaSessionCallback = object : MediaSessionCompat.Callback() {
+                override fun onMediaButtonEvent(mediaButtonIntent: Intent): Boolean {
+                    val event = mediaButtonIntent.getParcelableExtra<KeyEvent>(Intent.EXTRA_KEY_EVENT)
+                    if (event?.action == KeyEvent.ACTION_DOWN) {
+                        when (event.keyCode) {
+                            KeyEvent.KEYCODE_MEDIA_PLAY,
+                            KeyEvent.KEYCODE_MEDIA_PAUSE,
+                            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+                            KeyEvent.KEYCODE_HEADSETHOOK -> {
+                                Log.d(TAG, "Media Button PRESS: ANUNCIANDO UBICACIÓN")
+                                // ⭐ ACCIÓN CLAVE: ANUNCIAR UBICACIÓN
+                                announceCurrentLocation()
+                                return true // Evento consumido
+                            }
+                        }
+                    }
+                    return super.onMediaButtonEvent(mediaButtonIntent)
+                }
+            }
+
+            setCallback(mediaSessionCallback)
+        }
+        // ⭐ --- 3. INICIAR REPRODUCTOR DE SILENCIO PARA AGARRAR EL FOCO ---
+        silencePlayer = SilencePlayer(this).also {
+            it.playForever() // Reproducimos el audio en silencio continuamente
+            Log.d(TAG, "SilencePlayer iniciado para mantener el foco de audio.")
+        }
+    }
+
+    private fun announceCurrentLocation() {
+        if (isTtsInitialized && lastStreetMessage.isNotEmpty()) {
+            speak(lastStreetMessage)
+            Log.d(TAG, "Media Button PRESS: Anunciando: $lastStreetMessage")
+        } else {
+            speak("Buscando su ubicación. Espere un momento.")
+        }
+    }
+
 
     // --------------------------------------------------------
 // (Asegúrate de que tus funciones auxiliares estén aquí)
@@ -245,7 +344,7 @@ class LocationService : Service(), TextToSpeech.OnInitListener {
         }
     }
 
-
+    // ⭐ NUEVA FUNCIÓN: Implementación de Geocodificación Inversa
     private fun processAddressAndAnnounce(address: Address?, fullAddressText: String) {
 
 
@@ -322,10 +421,11 @@ class LocationService : Service(), TextToSpeech.OnInitListener {
 
         // 4. Actualizar la notificación con el nuevo mensaje (opcional)
         updateNotification(streetMessage)
+        lastStreetMessage = streetMessage
     }
 
-    // --- Funciones Auxiliares (Asegúrate de que existan en tu código) ---
 
+    // Método para iniciar las actualizaciones de ubicación
     private fun startLocationUpdates() {
         if (checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, null)
